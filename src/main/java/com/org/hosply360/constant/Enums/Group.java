@@ -1,0 +1,17 @@
+package com.org.hosply360.constant.Enums;
+
+public enum Group {
+
+    SUNDRY_DEBTORS,
+    SUNDRY_CREDITORS,
+    DIRECT_EXPENSES,
+    INDIRECT_EXPENSES,
+    DIRECT_INCOME,
+    INDIRECT_INCOME,
+    PURCHASE_ACCOUNTS,
+    SALES_ACCOUNTS,
+    GODOWN,
+    BROKER,
+    CASH_IN_HAND,
+    BANK_ACCOUNTS
+}

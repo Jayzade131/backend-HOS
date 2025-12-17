@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Credentials</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f6f9fc;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .info {
+            background-color: #f0f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+        .btn-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 25px;
+            padding: 12px 20px;
+            background-color: #2b8787;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .footer {
+            font-size: 13px;
+            color: #888888;
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <p>Dear <strong th:text="${name}">[Name]</strong>,</p>
+    <p>Your account has been created. Please use the credentials below to log in:</p>
+
+    <div class="info">
+        <p><strong>Username:</strong> <span th:text="${username}">[Username]</span></p>
+        <p><strong>Default Password:</strong> <span th:text="${password}">[Password]</span></p>
+    </div>
+
+    <div class="btn-container">
+        <a class="btn" th:href="${loginLink}" target="_blank">Login Now</a>
+    </div>
+
+    <p style="margin-top: 20px;">For your security, please change your password after your first login.</p>
+
+    <div class="footer">
+        &copy; 2025 Hosply360. All rights reserved.
+    </div>
+</div>
+</body>
+</html>

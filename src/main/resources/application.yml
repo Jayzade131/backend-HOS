@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: hosply360
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+
+  config:
+    import: "optional:configserver:${SPRING_CLOUD_CONFIG_URI}"

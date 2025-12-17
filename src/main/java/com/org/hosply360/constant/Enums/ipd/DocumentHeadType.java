@@ -1,0 +1,12 @@
+package com.org.hosply360.constant.Enums.ipd;
+
+public enum DocumentHeadType {
+    OPD_PRESCRIPTION,
+    ADMISSION_PAPER_CARD,
+    DAILY_NOTES,
+    OT_NOTES_PROCEDURE,
+    INVESTIGATION_PAPER,
+    DISCHARGE_SUMMARY,
+    OTHER_CHARTING_VISITING_NOTES,
+    ANY_OTHER
+}
