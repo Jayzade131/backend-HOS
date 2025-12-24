@@ -30,7 +30,6 @@ import com.org.hosply360.dto.utils.PdfHeaderFooterDTO;
 import com.org.hosply360.exception.FrontDeskException;
 import com.org.hosply360.exception.GlobalMasterException;
 import com.org.hosply360.exception.OPDException;
-import com.org.hosply360.helper.CustomUserDetails;
 import com.org.hosply360.repository.OPDRepo.AppointmentRepository;
 import com.org.hosply360.repository.OPDRepo.OPDInvoiceRepository;
 import com.org.hosply360.repository.OPDRepo.OPDReceiptRepository;
@@ -42,6 +41,7 @@ import com.org.hosply360.service.OPD.OPDInvoiceService;
 import com.org.hosply360.service.OPD.OPDPaymentHistoryService;
 import com.org.hosply360.util.Others.AmountToWordsUtil;
 import com.org.hosply360.util.Others.SequenceGeneratorService;
+import com.org.hosply360.util.Others.UserUtilis;
 import com.org.hosply360.util.encryptionUtil.EncryptionUtil;
 import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
 import com.org.hosply360.util.mapper.ObjectMapperUtil;
@@ -49,7 +49,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -339,6 +338,7 @@ public class OPDInvoiceServiceImpl implements OPDInvoiceService {
                 + invoice.getPatient().getPatientPersonalInformation().getLastName();
 
         // Age
+
         LocalDate dob = LocalDate.parse(invoice.getPatient().getPatientPersonalInformation().getDateOfBirth());
         Period age = Period.between(dob, LocalDate.now());
         String ageStr = age.getYears() + " Years " + age.getMonths() + " Months";
@@ -406,8 +406,8 @@ public class OPDInvoiceServiceImpl implements OPDInvoiceService {
             appointment.setStatus(AppointmentStatus.PAID);
             appointmentRepository.save(appointment); // save the appointment
         }
-        CustomUserDetails principal = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal(); // get the principal
-        String userRole = principal.getUser().getUsername(); // get the user role
+
+        String userRole = UserUtilis.getLoggedInUsername();
         String receiptNumber = sequenceGeneratorService.generateReceiptNumber(); // generate the receipt number
         OPDReceipt savedReceipt = opdReceiptRepository.save(OPDReceipt.builder() // save the receipt
                 .invoiceId(updatedInvoice.getInvoiceNumber())

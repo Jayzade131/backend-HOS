@@ -93,7 +93,7 @@ public class IPDAdmissionController {
         int actualPage = (page > 0) ? page - 1 : 0;
 
         Page<IPDPatientListDTO> admissions =
-                ipdAdmissionService.getPatientList(orgId,id, wardId, ipdStatus, fromDate, toDate, actualPage, size);
+                ipdAdmissionService.getPatientList(orgId, id, wardId, ipdStatus, fromDate, toDate, actualPage, size);
 
         return ResponseEntity.ok(
                 AppResponseDTO.getOk(
@@ -109,6 +109,12 @@ public class IPDAdmissionController {
     public ResponseEntity<AppResponseDTO> getBedsByWard(
             @PathVariable String ipdAdmissionId) {
         return ResponseEntity.ok(AppResponseDTO.ok(ipdAdmissionService.getIpdBarcode(ipdAdmissionId)));
+    }
+
+    @GetMapping(EndpointConstants.IPD_ADMISSION_RECORD)
+    public ResponseEntity<AppResponseDTO> getAdmissionRecord(
+            @PathVariable String ipdAdmissionId) {
+        return ResponseEntity.ok(AppResponseDTO.ok(ipdAdmissionService.getAdmissionRecord(ipdAdmissionId)));
     }
 
 

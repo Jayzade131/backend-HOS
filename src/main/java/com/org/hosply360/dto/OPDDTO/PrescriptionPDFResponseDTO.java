@@ -2,6 +2,7 @@ package com.org.hosply360.dto.OPDDTO;
 
 import com.org.hosply360.constant.Enums.TestWhen;
 import com.org.hosply360.dto.globalMasterDTO.TestDTO;
+import com.org.hosply360.dto.pathologyDTO.PrescribedMedPdfResponseDTO;
 import com.org.hosply360.dto.utils.PdfHeaderFooterDTO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -41,13 +42,13 @@ public class PrescriptionPDFResponseDTO {
 
     private VitalsDTO vitals;
 
-    private List<TestDTO> test;
+    private List<String> test;
 
     private TestWhen testWhen;
 
     private String diagnosis;
 
-    private List<PrescribedMedResponseDTO> prescribedMeds;
+    private List<PrescribedMedPdfResponseDTO> prescribedMeds;
 
     private String advice;
 

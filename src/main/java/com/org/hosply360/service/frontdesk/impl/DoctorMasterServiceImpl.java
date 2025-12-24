@@ -1,5 +1,6 @@
 package com.org.hosply360.service.frontdesk.impl;
 
+import com.org.hosply360.cacheService.DoctorCacheService;
 import com.org.hosply360.constant.Enums.DoctorType;
 import com.org.hosply360.constant.Enums.RoleEnum;
 import com.org.hosply360.constant.ErrorConstant;
@@ -70,6 +71,7 @@ public class DoctorMasterServiceImpl implements DoctorMasterService {
     private final BillingItemGroupRepository billingItemGroupRepository;
     private final UsersRepository usersRepository;
     private final TariffMasterRepository tariffRepository;
+    private final DoctorCacheService doctorCacheService;
 
 
     private static DoctorDTO getDoctorDTO(Doctor doctor) {
@@ -219,7 +221,7 @@ public class DoctorMasterServiceImpl implements DoctorMasterService {
 
 
 
-        Doctor savedDoctor = doctorRepository.save(doctor);
+        Doctor savedDoctor = doctorCacheService.saveDoctor(doctor);
         if (Objects.nonNull(savedDoctor)) {
             BillingItemGroup bgEntity = billingItemGroupRepository
                     .findByItemGroupNameAndDefunct("consultant", false)
@@ -365,7 +367,7 @@ public class DoctorMasterServiceImpl implements DoctorMasterService {
         existingDoctor.setTotalSecondVisitRate(finalSecondVisitRate);
 
 
-        Doctor savedDoctor = doctorRepository.save(existingDoctor);
+        Doctor savedDoctor = doctorCacheService.saveDoctor(existingDoctor);
 
 
         logger.info("Doctor with ID {} updated successfully", savedDoctor.getId());
@@ -380,7 +382,7 @@ public class DoctorMasterServiceImpl implements DoctorMasterService {
         logger.info("Deleting doctor with ID: {}", id);
 
         doctor.setDefunct(true);
-        doctorRepository.save(doctor);
+        doctorCacheService.saveDoctor(doctor);
 
         logger.info("deleted doctor with ID: {}", id);
     }
@@ -388,20 +390,19 @@ public class DoctorMasterServiceImpl implements DoctorMasterService {
     @Override
     public List<AppointmentDocInfoDTO> getAllDoctorsBySpeciality(String speId, String orgId) {
         logger.info("Fetching all doctors by specialty ID: {}", speId);
-
-        List<AppointmentDocInfoDTO> bySpecialtityIdAndDefunct = doctorRepository.findBySpecialtityIdAndDefunct(speId, false, orgId);
+        List<AppointmentDocInfoDTO> bySpecialtityIdAndDefunct = doctorCacheService.getDoctorsBySpeciality(speId, false, orgId);
         return bySpecialtityIdAndDefunct.stream().peek(map -> map.setSpecialtyId(speId)).toList();
 
     }
 
     @Override
-    public List<AppointmentDocInfoDTO> FetchAllDoctor(String orgId) {
+    public List<AppointmentDocInfoDTO> fetchAllDoctor(String orgId) {
         logger.info("Fetching all doctors By Specialty");
-        return doctorRepository.findAllByDefuncts(false, orgId);
+        return doctorCacheService.getDoctorsByOrg(false, orgId);
     }
 
     @Override
     public List<AppointmentDocInfoDTO> getDoctorByDoctorType(DoctorType doctorType, String orgId) {
-       return doctorRepository.findByDoctorTypeAndDefunct(false,orgId,doctorType);
+       return doctorCacheService.getDoctorsByType(false,orgId,doctorType);
     }
 }

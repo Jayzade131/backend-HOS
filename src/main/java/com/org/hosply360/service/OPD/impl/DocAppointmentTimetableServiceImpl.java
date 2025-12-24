@@ -1,5 +1,6 @@
 package com.org.hosply360.service.OPD.impl;
 
+import com.org.hosply360.cacheService.DocTimeTableCacheService;
 import com.org.hosply360.constant.Enums.AppointmentStatus;
 import com.org.hosply360.constant.ErrorConstant;
 import com.org.hosply360.dao.OPD.Appointment;
@@ -43,6 +44,7 @@ public class DocAppointmentTimetableServiceImpl implements DocAppointmentTimetab
     private final DoctorMasterRepository doctorRepository;
     private final OrganizationMasterRepository organizationRepository;
     private final AppointmentRepository appointmentRepository;
+    private final DocTimeTableCacheService  docTimeTableCacheService;
 
     private boolean isValidSession(String from, String to) {
         return from != null && !from.isBlank() && !"--".equals(from)
@@ -143,7 +145,7 @@ public class DocAppointmentTimetableServiceImpl implements DocAppointmentTimetab
         entity.setDefunct(false);
         entity.setWeeklySchedule(validScheduleMap);
 
-        DocAppointmentTimetable saved = timetableRepository.save(entity);
+        DocAppointmentTimetable saved = docTimeTableCacheService.saveDocAppointmentTimetable(entity);
         logger.info("OP Timetable created successfully with ID {}", saved.getId());
 
         return convertToDTO(saved);
@@ -210,7 +212,7 @@ public class DocAppointmentTimetableServiceImpl implements DocAppointmentTimetab
         existing.setSpecialtyId(doctor.getSpecialty());
         existing.setWeeklySchedule(updatedSchedule);
 
-        DocAppointmentTimetable updated = timetableRepository.save(existing);
+        DocAppointmentTimetable updated = docTimeTableCacheService.saveDocAppointmentTimetable(existing);
         logger.info("OP Timetable updated successfully with ID {}", updated.getId());
 
         return convertToDTO(updated);
@@ -223,7 +225,7 @@ public class DocAppointmentTimetableServiceImpl implements DocAppointmentTimetab
                 .orElseThrow(() -> new OPDException(ErrorConstant.OP_TIMETABLE_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         timetable.setDefunct(true);
-        timetableRepository.save(timetable);
+        docTimeTableCacheService.saveDocAppointmentTimetable(timetable);
         logger.info("OP Timetable deleted successfully with ID {}", id);
 
         this.updateFutureAppointmentsToPending(timetable.getDoctorId().getId());
@@ -249,10 +251,6 @@ public class DocAppointmentTimetableServiceImpl implements DocAppointmentTimetab
 
     @Override
     public OpTimetableDTO getOpTimetableByDoctorId(String doctorId, String organizationId) {
-        DocAppointmentTimetable timetable = timetableRepository.findByDoctorIdAndDefunctAndOrg(doctorId, false, organizationId);
-        if (timetable == null) {
-            throw new OPDException(ErrorConstant.OP_TIMETABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
-        }
-        return convertToDTO(timetable);
+     return    docTimeTableCacheService.getOpTimetableByDoctor(doctorId, false, organizationId);
     }
 }

@@ -2,7 +2,7 @@ package com.org.hosply360.service.IPD;
 
 import com.org.hosply360.dto.IPDDTO.IpdTransferDTO;
 import com.org.hosply360.dto.IPDDTO.IpdTransferHistoryDto;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
+import com.org.hosply360.dto.IPDDTO.TransferReceiptPdfDTO;
 
 import java.util.List;
 
@@ -11,5 +11,6 @@ public interface IPDTransferService {
 
     List<IpdTransferHistoryDto> getTransfersByIpdAdmission(String ipdAdmissionId);
 
-    PdfResponseDTO generateTransferReceiptPdf(String transferId);
+    TransferReceiptPdfDTO getTransferReceiptPdf(String transferId);
+
 }

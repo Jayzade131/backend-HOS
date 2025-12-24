@@ -1,7 +1,6 @@
 package com.org.hosply360.controller.pathology;
 
 import com.org.hosply360.constant.EndpointConstants;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
 import com.org.hosply360.dto.authDTO.AppResponseDTO;
 import com.org.hosply360.dto.pathologyDTO.PackageTestReportReqDTO;
 import com.org.hosply360.dto.pathologyDTO.PagedResultForTest;
@@ -35,28 +34,34 @@ public class TestReportController {
     public ResponseEntity<AppResponseDTO> createTestReport(@RequestBody TestReportReqDTO testReportReqDTO) {
         return ResponseEntity.ok(AppResponseDTO.ok(testReportService.createTestReport(testReportReqDTO)));
     }
+
     @PutMapping(EndpointConstants.TEST_REPORT)
     public ResponseEntity<AppResponseDTO> updateTestReport(@RequestBody TestReportReqDTO testReportReqDTO) {
-        return ResponseEntity.ok(AppResponseDTO.ok( testReportService.updateTestReport(testReportReqDTO)));
+        return ResponseEntity.ok(AppResponseDTO.ok(testReportService.updateTestReport(testReportReqDTO)));
     }
+
     @PostMapping(EndpointConstants.PACKAGE_TEST_REPORT)
     public ResponseEntity<AppResponseDTO> createPackageTestReport(@RequestBody PackageTestReportReqDTO testReportReqPackageDTO) {
         return ResponseEntity.ok(AppResponseDTO.ok(testReportService.createPackageTestReport(testReportReqPackageDTO)));
     }
+
     @PutMapping(EndpointConstants.PACKAGE_TEST_REPORT)
     public ResponseEntity<AppResponseDTO> updatePackageTestReport(@RequestBody PackageTestReportReqDTO testReportReqPackageDTO) {
         return ResponseEntity.ok(AppResponseDTO.ok(testReportService.updatePackageTestReport(testReportReqPackageDTO)));
     }
+
     @GetMapping(EndpointConstants.TEST_REPORT_BY_ID)
     public ResponseEntity<AppResponseDTO> getTestReportById(@PathVariable String testReportId) {
         logger.info("Fetching Test Report by ID");
         return ResponseEntity.ok(AppResponseDTO.ok(testReportService.getTestReportById(testReportId)));
     }
+
     @GetMapping(EndpointConstants.PACKAGE_TEST_REPORT_ID)
     public ResponseEntity<AppResponseDTO> getPackageTestReportById(@PathVariable String packageTestReportId) {
         logger.info("Fetching Package Test Report by ID");
         return ResponseEntity.ok(AppResponseDTO.ok(testReportService.getPackageTestReportById(packageTestReportId)));
     }
+
     @GetMapping(EndpointConstants.GET_TEST_REPORT)
     public ResponseEntity<AppResponseDTO> getTestReports(
             @RequestParam String orgId,
@@ -66,7 +71,7 @@ public class TestReportController {
             @RequestParam(required = false) String mobileNo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PagedResultForTest<?> result = testReportService.getTestReports(orgId,fromDate,toDate,pId,mobileNo,page,size);
+        PagedResultForTest<?> result = testReportService.getTestReports(orgId, fromDate, toDate, pId, mobileNo, page, size);
         long totalPages = (long) Math.ceil((double) result.getTotal() / result.getSize());
 
         return ResponseEntity.ok(
@@ -88,7 +93,7 @@ public class TestReportController {
             @RequestParam(required = false) String mobileNo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PagedResultForTest<?> result = testReportService.getPackageTestReports(orgId,fromDate,toDate,pId,mobileNo,page,size);
+        PagedResultForTest<?> result = testReportService.getPackageTestReports(orgId, fromDate, toDate, pId, mobileNo, page, size);
         long totalPages = (long) Math.ceil((double) result.getTotal() / result.getSize());
 
         return ResponseEntity.ok(
@@ -98,23 +103,24 @@ public class TestReportController {
                         totalPages,
                         result.getPage()
                 )
-        );    }
+        );
+    }
 
-    @GetMapping(EndpointConstants.DOWNLOAD_TEST_REPORT)
-    public ResponseEntity<AppResponseDTO> downloadTestReportPDF(@RequestParam String testReportId) {
-        PdfResponseDTO pdfResponseDTO = testReportService.generateTestReportPdf(testReportId);
+    @GetMapping(EndpointConstants.TEST_REPORT_PDF_RESPONSE)
+    public ResponseEntity<AppResponseDTO> getTestReportPdfResponseDTO(@RequestParam String testReportId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(AppResponseDTO.ok(pdfResponseDTO));
+                .body(AppResponseDTO.ok(testReportService.getTestReportPdfResponseDTO(testReportId)));
     }
-    @GetMapping(EndpointConstants.DOWNLOAD_PACKAGE_TEST_REPORT)
-    public ResponseEntity<AppResponseDTO> downloadPackageTestReportPDF(
-            @RequestParam String packageTestReportId) {
-        PdfResponseDTO pdfResponseDTO = testReportService.generatePackageTestReportPdf(packageTestReportId);
+
+
+    @GetMapping(EndpointConstants.PACKAGE_TEST_REPORT_PDF)
+    public ResponseEntity<AppResponseDTO> getPackageTestReportPdfResponseDTO(@RequestParam String packageTestReportId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(AppResponseDTO.ok(pdfResponseDTO));
+                .body(AppResponseDTO.ok(testReportService.getPackageTestReportPdfResponseDTO(packageTestReportId)));
     }
+
 }
 
 

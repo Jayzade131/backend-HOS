@@ -1,8 +1,8 @@
 package com.org.hosply360.service.IPD;
 
+import com.org.hosply360.dto.IPDDTO.DietPlanPdfResponseDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDeitDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDietReqDTO;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
 
 import java.util.List;
 
@@ -18,5 +18,5 @@ public interface IPDDietService {
 
     List<IPDDeitDTO> getAllDiet(String ipdAdmissionId);
 
-    PdfResponseDTO generateDietPlanPdf(String ipdAdmissionId);
+    DietPlanPdfResponseDTO getDietPlanPdf(String ipdAdmissionId);
 }

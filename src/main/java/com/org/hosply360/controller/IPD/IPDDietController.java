@@ -2,13 +2,12 @@ package com.org.hosply360.controller.IPD;
 
 import com.org.hosply360.constant.ApplicationConstant;
 import com.org.hosply360.constant.EndpointConstants;
+import com.org.hosply360.dto.IPDDTO.DietPlanPdfResponseDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDietReqDTO;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
 import com.org.hosply360.dto.authDTO.AppResponseDTO;
 import com.org.hosply360.service.IPD.IPDDietService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,8 +52,8 @@ public class IPDDietController {
     }
 
     @GetMapping(EndpointConstants.IPD_DIET_PLAN)
-    public ResponseEntity<AppResponseDTO> generateDietPlanPdf (@RequestParam String ipdAdmissionId){
-        PdfResponseDTO pdfResponseDTO = ipdDietService.generateDietPlanPdf(ipdAdmissionId);
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(AppResponseDTO.ok(pdfResponseDTO));
+    public ResponseEntity<AppResponseDTO> getDietPlan(@RequestParam String ipdAdmissionId) {
+        DietPlanPdfResponseDTO response = ipdDietService.getDietPlanPdf(ipdAdmissionId);
+        return ResponseEntity.ok(AppResponseDTO.ok(response));
     }
 }

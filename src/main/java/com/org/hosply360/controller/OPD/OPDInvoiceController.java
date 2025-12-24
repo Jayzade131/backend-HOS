@@ -89,7 +89,7 @@ public class OPDInvoiceController {
         );
     }
 
-    @GetMapping("/with-appointments")
+    @GetMapping(EndpointConstants.INVOICE_WITH_APPOINTMENTS)
     public ResponseEntity<AppResponseDTO> getInvoicesWithAppointments(
             @RequestParam String orgId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,

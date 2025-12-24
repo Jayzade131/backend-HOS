@@ -1,5 +1,6 @@
 package com.org.hosply360.service.frontdesk.impl;
 
+import com.org.hosply360.cacheService.PatientCacheService;
 import com.org.hosply360.constant.ErrorConstant;
 import com.org.hosply360.dao.frontDeskDao.Doctor;
 import com.org.hosply360.dao.frontDeskDao.Patient;
@@ -92,6 +93,7 @@ public class PatientServiceImpl implements PatientMasterService {
     private final InsuranceProviderRepository insuranceProviderRepository;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final OrganizationMasterRepository organizationMasterRepository;
+    private final PatientCacheService patientCacheService;
 
     private void decryptPatientDTO(PatientResponseDTO dto) {
         dto.setFirstName(EncryptionUtil.decrypt(dto.getFirstName()));
@@ -431,7 +433,7 @@ public class PatientServiceImpl implements PatientMasterService {
         }else{
             patient.setImage(null);
         }
-        patientRepository.save(patient);
+        patientCacheService.savePatient(patient);
         return patient.getId();
     }
 
@@ -452,15 +454,7 @@ public class PatientServiceImpl implements PatientMasterService {
         @Override
         public List<PatientInfoDTO> fetchAllPatient(String organizationId) {
             logger.info("Fetching all patients");
-            List<Patient> allPatient = patientRepository.findAllByDefuncts(false, organizationId);
-            return allPatient.stream().map(patient -> {
-                PatientInfoDTO patientInfoDTO = ObjectMapperUtil.copyObject(patient, PatientInfoDTO.class);
-                patientInfoDTO.setFirstname(patient.getPatientPersonalInformation().getFirstName());
-                patientInfoDTO.setPid(patient.getPId());
-                patientInfoDTO.setLastname(patient.getPatientPersonalInformation().getLastName());
-                patientInfoDTO.setPatientNumber(patient.getPatientContactInformation().getPrimaryPhone());
-                return patientInfoDTO;
-            }).toList();
+            return patientCacheService.fetchPatients(false, organizationId);
         }
 
     @Override
@@ -468,7 +462,7 @@ public class PatientServiceImpl implements PatientMasterService {
         logger.info("Deleting patient with ID {}", id);
         Patient patient = patientRepository.findByIdAndDefunct(id, false).orElseThrow(() -> new FrontDeskException(ErrorConstant.PATIENT_NOT_FOUND, HttpStatus.NOT_FOUND));
         patient.setDefunct(true);
-        patientRepository.save(patient);
+        patientCacheService.savePatient(patient);
         logger.info("Patient deleted successfully with ID {}", id);
     }
 }

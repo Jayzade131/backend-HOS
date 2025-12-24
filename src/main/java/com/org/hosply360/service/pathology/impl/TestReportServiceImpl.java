@@ -11,26 +11,30 @@ import com.org.hosply360.dao.pathology.PackageTestReport;
 import com.org.hosply360.dao.pathology.TestManager;
 import com.org.hosply360.dao.pathology.TestReport;
 import com.org.hosply360.dao.pathology.TestReportParameter;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
 import com.org.hosply360.dto.frontDeskDTO.PatientDTO;
 import com.org.hosply360.dto.pathologyDTO.GetResPacTestReportDTO;
 import com.org.hosply360.dto.pathologyDTO.GetResTestReportDTO;
 import com.org.hosply360.dto.pathologyDTO.PackageTestReportDTO;
 import com.org.hosply360.dto.pathologyDTO.PackageTestReportItem;
+import com.org.hosply360.dto.pathologyDTO.PackageTestReportItemDTO;
+import com.org.hosply360.dto.pathologyDTO.PackageTestReportPdfResponseDTO;
 import com.org.hosply360.dto.pathologyDTO.PackageTestReportReqDTO;
 import com.org.hosply360.dto.pathologyDTO.PagedResultForTest;
+import com.org.hosply360.dto.pathologyDTO.PatientBillInfoDTO;
 import com.org.hosply360.dto.pathologyDTO.TestDataReqDTO;
 import com.org.hosply360.dto.pathologyDTO.TestManagerDTO;
 import com.org.hosply360.dto.pathologyDTO.TestReportDTO;
+import com.org.hosply360.dto.pathologyDTO.TestReportParameterDTO;
+import com.org.hosply360.dto.pathologyDTO.TestReportPdfResponseDTO;
 import com.org.hosply360.dto.pathologyDTO.TestReportReqDTO;
 import com.org.hosply360.exception.pathologyException;
 import com.org.hosply360.repository.PathologyRepo.PackageTestReportRepository;
 import com.org.hosply360.repository.PathologyRepo.TestReportRepository;
 import com.org.hosply360.service.pathology.TestReportService;
 import com.org.hosply360.util.Others.EntityFetcherUtil;
-import com.org.hosply360.util.PDFGenUtil.PackageTestReportPdfGenerator;
-import com.org.hosply360.util.PDFGenUtil.ReportPdfGenerator;
+import com.org.hosply360.util.Others.UserUtilis;
 import com.org.hosply360.util.encryptionUtil.EncryptionUtil;
+import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
 import com.org.hosply360.util.mapper.ObjectMapperUtil;
 import com.org.hosply360.util.validator.ValidatorHelper;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +53,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.org.hosply360.util.mapper.PatientMapperUtil.buildPatientBillInfo;
+
 @Service
 @RequiredArgsConstructor
 public class TestReportServiceImpl implements TestReportService {
@@ -56,8 +62,6 @@ public class TestReportServiceImpl implements TestReportService {
     private static final Logger logger = LoggerFactory.getLogger(TestReportServiceImpl.class);
     private final TestReportRepository testReportRepository;
     private final PackageTestReportRepository packageTestReportRepository;
-    private final ReportPdfGenerator reportPdfGenerator;
-    private final PackageTestReportPdfGenerator packageTestReportPdfGenerator;
     private final EntityFetcherUtil entityFetcherUtil;
 
     // decrypt the patient dto for test report
@@ -77,79 +81,108 @@ public class TestReportServiceImpl implements TestReportService {
     // decrypt the patient dto for package test report
     @Override
     public String createTestReport(TestReportReqDTO reqDTO) {
-        ValidatorHelper.validateObject(reqDTO); //validate the request dto
-        logger.info("Starting creation of test report for organizationId: {}, testManagerId: {}, patientId: {}",
-                reqDTO.getOrganizationId(), reqDTO.getTestManagerId(), reqDTO.getPatientId());
-        TestManager testManager = entityFetcherUtil.getTestMangerOrThrow(reqDTO.getTestManagerId()); //get the test manager
-        if (TestStatus.PENDING.equals(testManager.getStatus())) { //check the test manager status
+
+        ValidatorHelper.validateObject(reqDTO);
+
+        TestManager testManager = entityFetcherUtil.getTestMangerOrThrow(reqDTO.getTestManagerId());
+
+        // business rules
+        if (TestStatus.PENDING.equals(testManager.getStatus())) {
             throw new pathologyException(ErrorConstant.CHANGE_THE_STATUS, HttpStatus.BAD_REQUEST);
         }
-        if (TestSource.PACKAGE.equals(testManager.getSource())) { //check the test source
+
+        if (TestSource.PACKAGE.equals(testManager.getSource())) {
             throw new pathologyException(ErrorConstant.INVALID_TEST_SOURCE, HttpStatus.BAD_REQUEST);
         }
-        TestDataReqDTO testData = Optional.ofNullable(reqDTO.getTestDataReqDTOS()) //get the test data
-                .filter(d -> d.getTestId() != null) //check the test id
-                .orElseThrow(() -> new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST));
-        Test test = entityFetcherUtil.getTestOrThrow(testData.getTestId()); //get the test
-        List<TestReportParameter> parameters = mapTestValuesToParameters(test, testData.getParametersValues()); //map the test values to parameters
-        TestReport testReport = TestReport.builder() //build the test report
-                .reportDate(LocalDateTime.now())
-                .testManager(testManager)
-                .defunct(false)
-                .patient(entityFetcherUtil.getPatientOrThrow(reqDTO.getPatientId()))
-                .test(test)
-                .doctor(entityFetcherUtil.getDoctorOrThrow(reqDTO.getDoctorId()))
-                .organization(entityFetcherUtil.getOrganizationOrThrow(reqDTO.getOrganizationId()))
-                .parameters(parameters)
-                .build();
-        String reportId = testReportRepository.save(testReport).getId(); //save the test report
-        logger.info("Test report {} saved successfully", reportId);
-        return reportId; //return the report id
+
+        // prevent duplicate
+        boolean exists = testReportRepository.findByTestManagerIdAndTestIdAndDefunctFalse(reqDTO.getTestManagerId(), reqDTO.getTestDataReqDTOS().getTestId()).isPresent();
+
+        if (exists) {
+            throw new pathologyException(ErrorConstant.TEST_REPORT_ALREADY_EXISTS, HttpStatus.BAD_REQUEST);
+        }
+
+        TestReport testReport = TestReport.builder().defunct(false).build();
+
+        buildOrUpdateTestReport(testReport, reqDTO, testManager);
+
+        return testReportRepository.save(testReport).getId();
     }
+
 
     // map test values to parameters
     private List<TestReportParameter> mapTestValuesToParameters(Test test, List<TestReportParameter> inputParameters) {
         List<TestParameterMaster> masters = test.getTestParameterMasters(); //get the test parameter masters
         List<TestReportParameter> reportParams = new ArrayList<>(); //create a list to store the report parameters
-        if (Objects.isNull(masters) || Objects.isNull(inputParameters)) return reportParams; //check the masters and input parameters are null or not
+        if (Objects.isNull(masters) || Objects.isNull(inputParameters))
+            return reportParams; //check the masters and input parameters are null or not
         for (TestParameterMaster master : masters) { //iterate over the masters
             TestReportParameter matchedInput = inputParameters.stream() //iterate over the input parameters
                     .filter(p -> p.getName() != null && p.getName().equalsIgnoreCase(master.getName())) //filter the input parameters
                     .findFirst() //get the first matched input parameter
                     .orElseThrow(() -> new pathologyException(ErrorConstant.MISSING_PARAMETER + master.getName(), HttpStatus.BAD_REQUEST));
             reportParams.add(TestReportParameter.builder() //build the report parameters
-                    .name(master.getName())
-                    .unit(master.getUnit())
-                    .referenceRange(master.getReferenceRange())
-                    .value(matchedInput.getValue())
-                    .build());
+                    .name(master.getName()).unit(master.getUnit()).referenceRange(master.getReferenceRange()).value(matchedInput.getValue()).build());
         }
         return reportParams; //return the report parameters
     }
 
+    private TestReport buildOrUpdateTestReport(TestReport testReport, TestReportReqDTO reqDTO, TestManager testManager) {
+
+        TestDataReqDTO testData = Optional.ofNullable(reqDTO.getTestDataReqDTOS()).filter(d -> d.getTestId() != null).orElseThrow(() -> new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST));
+
+        validateParameterValues(testData.getParametersValues());
+
+        Test test = entityFetcherUtil.getTestOrThrow(testData.getTestId());
+
+        List<TestReportParameter> parameters = mapTestValuesToParameters(test, testData.getParametersValues());
+
+        testReport.setTestManager(testManager);
+        testReport.setOrganization(entityFetcherUtil.getOrganizationOrThrow(reqDTO.getOrganizationId()));
+        testReport.setPatient(entityFetcherUtil.getPatientOrThrow(reqDTO.getPatientId()));
+        testReport.setDoctor(entityFetcherUtil.getDoctorOrThrow(reqDTO.getDoctorId()));
+        testReport.setTest(test);
+        testReport.setReportDate(LocalDateTime.now());
+        testReport.setParameters(parameters);
+
+        return testReport;
+    }
+
+
+    private void validateParameterValues(List<TestReportParameter> parameters) {
+
+        if (parameters == null || parameters.isEmpty()) {
+            throw new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST);
+        }
+
+        for (TestReportParameter param : parameters) {
+
+            if (param.getName() == null) {
+                throw new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST);
+            }
+
+            if (param.getValue() == null || param.getValue().trim().isEmpty()) {
+                throw new pathologyException(ErrorConstant.TEST_PARAMETER_VALUE_EMPTY + param.getName(), HttpStatus.BAD_REQUEST);
+            }
+        }
+    }
+
+
     // update test report
     @Override
     public String updateTestReport(TestReportReqDTO reqDTO) {
-        ValidatorHelper.validateObject(reqDTO); //validate the request dto
-        String reportId = reqDTO.getTestReportId(); //get the report id
-        logger.info("Updating test report with ID: {}", reportId);
-        TestReport testReport = entityFetcherUtil.getTestReportOrThrow(reportId); //get the test report
-        TestDataReqDTO testData = Optional.ofNullable(reqDTO.getTestDataReqDTOS()) //get the test data
-                .filter(d -> d.getTestId() != null) //filter the test data
-                .orElseThrow(() -> new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST));
-        Test test = entityFetcherUtil.getTestOrThrow(testData.getTestId()); //get the test
-        List<TestReportParameter> updatedParameters = mapTestValuesToParameters(test, testData.getParametersValues()); //map the test values to parameters
-        testReport.setTestManager(entityFetcherUtil.getTestMangerOrThrow(reqDTO.getTestManagerId()));
-        testReport.setOrganization(entityFetcherUtil.getOrganizationOrThrow(reqDTO.getOrganizationId()));
-        testReport.setPatient(entityFetcherUtil.getPatientOrThrow(reqDTO.getPatientId()));
-        testReport.setTest(test);
-        testReport.setDoctor(entityFetcherUtil.getDoctorOrThrow(reqDTO.getDoctorId()));
-        testReport.setReportDate(LocalDateTime.now());
-        testReport.setParameters(updatedParameters);
-        String updatedId = testReportRepository.save(testReport).getId(); //save the test report
-        logger.info("Test report [{}] updated successfully", updatedId);
-        return updatedId; //return the updated id
+
+        ValidatorHelper.validateObject(reqDTO);
+
+        TestReport testReport = entityFetcherUtil.getTestReportOrThrow(reqDTO.getTestReportId());
+
+        TestManager testManager = entityFetcherUtil.getTestMangerOrThrow(reqDTO.getTestManagerId());
+
+        buildOrUpdateTestReport(testReport, reqDTO, testManager);
+
+        return testReportRepository.save(testReport).getId();
     }
+
 
     // create package test report
     @Override
@@ -177,27 +210,14 @@ public class TestReportServiceImpl implements TestReportService {
                     TestDataReqDTO input = testDataInputs.stream() //get the test data
                             .filter(data -> testId.equals(data.getTestId())) //filter the test data
                             .findFirst() //get the first matched input parameter
-                            .orElseThrow(() -> new pathologyException(
-                                    ErrorConstant.MISSING_INPUT_FOR_TEST_ID + testId, HttpStatus.INTERNAL_SERVER_ERROR));
+                            .orElseThrow(() -> new pathologyException(ErrorConstant.MISSING_INPUT_FOR_TEST_ID + testId, HttpStatus.INTERNAL_SERVER_ERROR));
                     List<TestReportParameter> parameters = mapTestValuesToParameters(packageTest, input.getParametersValues()); //map the test values to parameters
                     return PackageTestReportItem.builder() //build the package test report item
-                            .test(packageTest)
-                            .reportDate(LocalDateTime.now())
-                            .parameters(parameters)
-                            .build();
-                })
-                .collect(Collectors.toList()); //collect the package tests
+                            .test(packageTest).reportDate(LocalDateTime.now()).parameters(parameters).build();
+                }).collect(Collectors.toList()); //collect the package tests
 
         PackageTestReport packageTestReport = PackageTestReport.builder() //build the package test report
-                .organization(entityFetcherUtil.getOrganizationOrThrow(dto.getOrganizationId()))
-                .testManager(testManager)
-                .doctor(entityFetcherUtil.getDoctorOrThrow(dto.getDoctorId()))
-                .patient(entityFetcherUtil.getPatientOrThrow(dto.getPatientId()))
-                .packageTestReportItem(reportItems)
-                .status(dto.getStatus())
-                .defunct(false)
-                .reportDate(LocalDateTime.now())
-                .build();
+                .organization(entityFetcherUtil.getOrganizationOrThrow(dto.getOrganizationId())).testManager(testManager).doctor(entityFetcherUtil.getDoctorOrThrow(dto.getDoctorId())).patient(entityFetcherUtil.getPatientOrThrow(dto.getPatientId())).packageTestReportItem(reportItems).status(dto.getStatus()).defunct(false).reportDate(LocalDateTime.now()).build();
         String reportId = packageTestReportRepository.save(packageTestReport).getId(); //save the package test report
         logger.info("Package test report [{}] saved successfully", reportId);
         return reportId; //return the report id
@@ -215,8 +235,8 @@ public class TestReportServiceImpl implements TestReportService {
         if (TestSource.INDIVIDUAL.equals(testManager.getSource())) { //check the test source
             throw new pathologyException(ErrorConstant.INVALID_TEST_SOURCE, HttpStatus.BAD_REQUEST);
         }
-        if(PackageTestStatus.COMPLETED.equals(packageTestReport.getStatus())){ //check the package test status
-            throw new pathologyException(ErrorConstant.DO_NOT_CHANGE_THE_STATUS,HttpStatus.BAD_REQUEST);
+        if (PackageTestStatus.COMPLETED.equals(packageTestReport.getStatus())) { //check the package test status
+            throw new pathologyException(ErrorConstant.DO_NOT_CHANGE_THE_STATUS, HttpStatus.BAD_REQUEST);
         }
         List<TestDataReqDTO> testDataReqDTOList = Optional.ofNullable(dto.getTestDataReqDTOS()) //get the test data
                 .filter(list -> !list.isEmpty()) //filter the test data
@@ -240,8 +260,7 @@ public class TestReportServiceImpl implements TestReportService {
                     item.setReportDate(LocalDateTime.now());
                     item.setParameters(parameters);
                     return item; //return the package test report item
-                })
-                .collect(Collectors.toList()); //collect the package tests
+                }).collect(Collectors.toList()); //collect the package tests
         packageTestReport.setOrganization(entityFetcherUtil.getOrganizationOrThrow(dto.getOrganizationId()));
         packageTestReport.setTestManager(testManager);
         packageTestReport.setPatient(entityFetcherUtil.getPatientOrThrow(dto.getPatientId()));
@@ -269,7 +288,7 @@ public class TestReportServiceImpl implements TestReportService {
         dto.setPatId(patientDTO.getId());
         dto.setPId(patientDTO.getPId());
         dto.setDoctorId(report.getDoctor().getId());
-        dto.setTestManagerDTO(ObjectMapperUtil.copyObject(report.getTestManager(),TestManagerDTO.class)); //set the test manager dto
+        dto.setTestManagerDTO(ObjectMapperUtil.copyObject(report.getTestManager(), TestManagerDTO.class)); //set the test manager dto
         dto.setReportDate(report.getReportDate());
         dto.setParameters(report.getParameters());
         return dto; //return the test report dto
@@ -305,7 +324,7 @@ public class TestReportServiceImpl implements TestReportService {
                 && !StringUtils.hasText(mobileNo)) { //check the mobile number
             throw new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST);
         }
-        LocalDateTime start = Objects.nonNull(fromDate)  ? fromDate.atStartOfDay() : null; //get the start date
+        LocalDateTime start = Objects.nonNull(fromDate) ? fromDate.atStartOfDay() : null; //get the start date
         LocalDateTime end = Objects.nonNull(toDate) ? toDate.atTime(LocalTime.MAX) : null; //get the end date
         String safeMobile = StringUtils.hasText(mobileNo) ? EncryptionUtil.encrypt(mobileNo) : null; //encrypt the mobile number
         PagedResultForTest<GetResTestReportDTO> reports = testReportRepository.findCustomTestReports(orgId, start, end, pId, safeMobile, page, size); //get the test reports
@@ -327,7 +346,7 @@ public class TestReportServiceImpl implements TestReportService {
                 && !StringUtils.hasText(mobileNo)) { //check the mobile number
             throw new pathologyException(ErrorConstant.INVALID_REQUEST_DATA, HttpStatus.BAD_REQUEST);
         }
-        LocalDateTime startDateTime = Objects.nonNull(fromDate)? fromDate.atStartOfDay() : null; //get the start date
+        LocalDateTime startDateTime = Objects.nonNull(fromDate) ? fromDate.atStartOfDay() : null; //get the start date
         LocalDateTime endDateTime = Objects.nonNull(toDate) ? toDate.atTime(LocalTime.MAX) : null; //get the end date
         String encryptedMobile = StringUtils.hasText(mobileNo) ? EncryptionUtil.encrypt(mobileNo) : null; //encrypt the mobile number
         PagedResultForTest<GetResPacTestReportDTO> reports = packageTestReportRepository.findCustomPackageTestReports(orgId, startDateTime, endDateTime, pId, encryptedMobile, page, size); //get the package test reports
@@ -341,27 +360,21 @@ public class TestReportServiceImpl implements TestReportService {
         return reports; //return the package test reports
     }
 
-    // generate test report pdf
     @Override
-    public PdfResponseDTO generateTestReportPdf(String testReportId) {
+    public TestReportPdfResponseDTO getTestReportPdfResponseDTO(String testReportId) {
         TestReport testReport = entityFetcherUtil.getTestReportOrThrow(testReportId); //get the test report
-        byte[] pdfBytes = reportPdfGenerator.generateTestReportPDF(testReport); //generate the test report pdf
-        String fileName = "TestReport_" + testReport.getPatient().getPId() + "_" + LocalDate.now() + ".pdf"; //get the file name
-        PdfResponseDTO pdfResponseDTO = new PdfResponseDTO(); //create the pdf response dto
-        pdfResponseDTO.setBody(pdfBytes);
-        pdfResponseDTO.setFileName(fileName);
-        return pdfResponseDTO; //return the pdf response dto
+        PatientBillInfoDTO patientDto = buildPatientBillInfo(testReport.getPatient());
+        List<TestReportParameterDTO> parameterDTOs = testReport.getParameters().stream().filter(Objects::nonNull).map(param -> TestReportParameterDTO.builder().name(param.getName()).value(param.getValue()).unit(param.getUnit()).referenceRange(param.getReferenceRange()).build()).toList();
+
+        return TestReportPdfResponseDTO.builder().headerFooter(HeaderFooterMapperUtil.buildHeaderFooter(testReport.getOrganization())).reportDateTime(testReport.getReportDate().toString()).patient(patientDto).parameters(parameterDTOs).generatedBy(UserUtilis.getLoggedInUsername()).build();
     }
 
-    // generate package test report pdf
     @Override
-    public PdfResponseDTO generatePackageTestReportPdf(String packageTestReportId) {
+    public PackageTestReportPdfResponseDTO getPackageTestReportPdfResponseDTO(String packageTestReportId) {
         PackageTestReport packageTestReport = entityFetcherUtil.getPackageTestReportOrThrow(packageTestReportId); //get the package test report
-        byte[] pdfBytes = packageTestReportPdfGenerator.generatePackageTestReportPDF(packageTestReport); //generate the package test report pdf
-        String fileName = "PackageTestReport_" + packageTestReport.getPatient().getPId() + "_" + LocalDate.now() + ".pdf"; //get the file name
-        PdfResponseDTO pdfResponseDTO = new PdfResponseDTO(); //create the pdf response dto
-        pdfResponseDTO.setBody(pdfBytes);
-        pdfResponseDTO.setFileName(fileName);
-        return pdfResponseDTO; //return the pdf response dto
+        PatientBillInfoDTO patientDto = buildPatientBillInfo(packageTestReport.getPatient());
+        List<PackageTestReportItemDTO> packageTestReportItemDTOs = packageTestReport.getPackageTestReportItem().stream().filter(Objects::nonNull).map(item -> PackageTestReportItemDTO.builder().testName(item.getTest().getName()).testId(item.getTest().getId()).reportDate(item.getReportDate()).parameters(item.getParameters().stream().filter(Objects::nonNull).map(param -> TestReportParameterDTO.builder().name(param.getName()).value(param.getValue()).unit(param.getUnit()).referenceRange(param.getReferenceRange()).build()).toList()).build()).toList();
+
+        return PackageTestReportPdfResponseDTO.builder().headerFooter(HeaderFooterMapperUtil.buildHeaderFooter(packageTestReport.getOrganization())).reportDateTime(packageTestReport.getReportDate().toString()).patient(patientDto).packageTestReportItem(packageTestReportItemDTOs).generatedBy(UserUtilis.getLoggedInUsername()).build();
     }
 }

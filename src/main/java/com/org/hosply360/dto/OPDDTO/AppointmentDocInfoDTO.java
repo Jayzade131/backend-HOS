@@ -6,12 +6,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AppointmentDocInfoDTO {
+public class AppointmentDocInfoDTO implements Serializable {
     private String doc_id;
     private String firstName;
     private String specialtyName;

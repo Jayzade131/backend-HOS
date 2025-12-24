@@ -121,6 +121,10 @@ public class ErrorConstant {
     public static final String ONLY_PENDING_OR_ACCEPTED_UPDATES_ALLOWED = "Only PENDING or ACCEPTED status updates are allowed";
     public static final String DO_NOT_CHANGE_THE_STATUS = "Cannot change the status when it is completed";
     public static final String INVALID_PAYMENT_AMOUNT = "Invalid Payment Amount";
+    public static final String AMOUNT_IS_GREATER_THAN_BALANCE = "Amount is greater than balance";
+    public static final String TEST_REPORT_ALREADY_EXISTS = "Test report already exists";
+    public static final String TEST_PARAMETER_VALUE_EMPTY = "Test parameter value is missing for parameter: ";
+
 
     // ==================================== IPD ===============================================
     public static final String IPD_ADMISSION_NOT_FOUND = "Admission not found";

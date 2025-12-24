@@ -1,23 +1,24 @@
 package com.org.hosply360.service.IPD.impl;
 
-import com.org.hosply360.constant.ApplicationConstant;
 import com.org.hosply360.constant.Enums.DietTime;
 import com.org.hosply360.constant.ErrorConstant;
 import com.org.hosply360.dao.IPD.IPDAdmission;
 import com.org.hosply360.dao.IPD.IPDDiet;
 import com.org.hosply360.dao.frontDeskDao.Patient;
 import com.org.hosply360.dao.globalMaster.Organization;
-import com.org.hosply360.dto.IPDDTO.DietPlanPdfDTO;
+import com.org.hosply360.dto.IPDDTO.DietInfoDTO;
+import com.org.hosply360.dto.IPDDTO.DietPlanPdfResponseDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDeitDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDietReqDTO;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
+import com.org.hosply360.dto.utils.PdfHeaderFooterDTO;
 import com.org.hosply360.exception.IPDException;
 import com.org.hosply360.repository.IPD.IPDAdmissionRepository;
 import com.org.hosply360.repository.IPD.IPDDietRepository;
 import com.org.hosply360.service.IPD.IPDDietService;
 import com.org.hosply360.util.Others.AgeUtil;
 import com.org.hosply360.util.Others.EntityFetcherUtil;
-import com.org.hosply360.util.PDFGenUtil.IPD.DietPlanPdfGenerator;
+import com.org.hosply360.util.Others.TimeUtil;
+import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
 import com.org.hosply360.util.mapper.ObjectMapperUtil;
 import com.org.hosply360.util.validator.ValidatorHelper;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +27,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,7 +41,6 @@ public class IPDDietServiceImpl implements IPDDietService {
     // Repositories & Services
     private final EntityFetcherUtil entityFetcherUtil;
     private final IPDDietRepository ipdDietRepository;
-    private final DietPlanPdfGenerator dietPlanPdfGenerator;
     private final IPDAdmissionRepository ipdAdmissionRepository;
 
     // Comparator for sorting diets by meal time
@@ -66,27 +63,6 @@ public class IPDDietServiceImpl implements IPDDietService {
         dto.setIpdAdmission(entity.getIpdAdmissionId().getId());
         dto.setDateTime(entity.getDateTime());
         return dto;
-    }
-
-    private DietPlanPdfDTO mapToPdfDTO(IPDDiet diet, IPDAdmission admission, Patient patient) {
-        return DietPlanPdfDTO.builder()
-                .mrdNo(admission.getRegMrdNo())
-                .ipdNo(admission.getIpdNo())
-                .admDate(admission.getAdmitDateTime() != null ? admission.getAdmitDateTime().toString() : "")
-                .consultant(admission.getPrimaryConsultant() != null ? admission.getPrimaryConsultant().getFirstName() : "")
-                .referredBy(admission.getRefBy() != null ? admission.getRefBy().getFirstName() : "")
-                .patientName(patient.getPatientPersonalInformation().getFirstName() + " " +
-                        patient.getPatientPersonalInformation().getLastName())
-                .ageGender(AgeUtil.getAge(patient.getPatientPersonalInformation().getDateOfBirth())
-                        + " / " + patient.getPatientPersonalInformation().getGender())
-                .mobileNo(patient.getPatientContactInformation().getPrimaryPhone())
-                .address("Raipur, (C.G)")
-                .remark(diet.getRemark())
-                .date(diet.getDateTime() != null ? diet.getDateTime().toLocalDate().toString() : "")
-                .dietTime(diet.getDietTime() != null ? diet.getDietTime().name() : "")
-                .diet(diet.getDiet() != null ? diet.getDiet().getName() : "")
-                .dietRemark(diet.getRemark())
-                .build();
     }
 
 
@@ -193,61 +169,57 @@ public class IPDDietServiceImpl implements IPDDietService {
     }
 
     @Override
-    public PdfResponseDTO generateDietPlanPdf(String ipdAdmissionId) {
-        log.debug("Generating PDF for admission: {}", ipdAdmissionId);
+    public DietPlanPdfResponseDTO getDietPlanPdf(String ipdAdmissionId) {
+        IPDAdmission admission = ipdAdmissionRepository.findById(ipdAdmissionId)
+                .orElseThrow(() ->
+                        new IPDException(ErrorConstant.IPD_ADMISSION_NOT_FOUND, HttpStatus.NOT_FOUND));
 
-        try {
-            // Fetch admission with patient data in a single query
-            IPDAdmission admission = ipdAdmissionRepository.findById(ipdAdmissionId)
-                    .orElseThrow(() -> {
-                        log.warn("Admission not found: {}", ipdAdmissionId);
-                        return new IPDException(ErrorConstant.IPD_ADMISSION_NOT_FOUND, HttpStatus.NOT_FOUND);
-                    });
+        Patient patient = admission.getPatient();
+        List<IPDDiet> diets = ipdDietRepository
+                .findByIpdAdmissionIdAndDefunct(ipdAdmissionId, false)
+                .stream()
+                .sorted(DIET_TIME_COMPARATOR)
+                .toList();
 
-            // Fetch and sort diets
-            List<IPDDiet> diets = ipdDietRepository
-                    .findByIpdAdmissionIdAndDefunct(ipdAdmissionId, false)
-                    .stream()
-                    .sorted(DIET_TIME_COMPARATOR)
-                    .toList();
-
-            if (diets.isEmpty()) {
-                log.warn("No active diets found for admission: {}", ipdAdmissionId);
-                throw new IPDException(ErrorConstant.IPD_DIET_NOT_FOUND, HttpStatus.NOT_FOUND);
-            }
-
-            // Generate PDF
-            Patient patient = admission.getPatient();
-            String patientName = Optional.ofNullable(patient)
-                    .map(Patient::getPatientPersonalInformation)
-                    .map(pi -> pi.getFirstName() + "_" + pi.getLastName())
-                    .orElse("diet_plan");
-
-            List<DietPlanPdfDTO> dtoList = diets.stream()
-                    .map(diet -> mapToPdfDTO(diet, admission, patient))
-                    .filter(Objects::nonNull)
-                    .toList();
-
-            byte[] pdf = dietPlanPdfGenerator.generateDietPlanPdf(dtoList);
-
-            // Create a safe filename
-            String fileName = String.format("%s%s_%s.pdf",
-                    ApplicationConstant.PDF_FILENAME_PREFIX_DIET_PLAN,
-                    patientName.replaceAll("[^a-zA-Z0-9.-]", "_"),
-                    LocalDate.now());
-
-            log.info("Generated diet plan PDF for admission: {}", ipdAdmissionId);
-            return PdfResponseDTO.builder()
-                    .body(pdf)
-                    .fileName(fileName)
-                    .build();
-
-        } catch (IPDException e) {
-            throw e; // Re-throw known exceptions
-        } catch (Exception e) {
-            log.error("Failed to generate diet plan PDF: {}", e.getMessage(), e);
-            throw new IPDException(ErrorConstant.CANNOT_CANCEL_IPD, HttpStatus.INTERNAL_SERVER_ERROR);
+        if (diets.isEmpty()) {
+            throw new IPDException(ErrorConstant.IPD_DIET_NOT_FOUND, HttpStatus.NOT_FOUND);
         }
+        Organization organization = admission.getOrgId();
+        PdfHeaderFooterDTO headerFooter = HeaderFooterMapperUtil.buildHeaderFooter(organization);
+
+        var personal = patient.getPatientPersonalInformation();
+        String ageGender = AgeUtil.getAge(personal) + " / " + personal.getGender();
+
+        List<IPDDiet> diet = ipdDietRepository
+                .findByIpdAdmissionIdAndDefunct(ipdAdmissionId, false)
+                .stream()
+                .sorted(DIET_TIME_COMPARATOR)
+                .toList();
+
+        List<DietInfoDTO> diet1 = diet.stream()
+                .map(ipdDiet -> {
+                    DietInfoDTO dto = new DietInfoDTO();
+                    dto.setDiet(ipdDiet.getDiet());
+                    dto.setDateTime(ipdDiet.getDateTime());
+                    dto.setDietTime(ipdDiet.getDietTime().toString());
+                    dto.setTime(ipdDiet.getTime());
+                    dto.setRemark(ipdDiet.getRemark());
+                    return dto;
+                })
+                .toList();
+
+        return DietPlanPdfResponseDTO.builder()
+                .headerFooter(headerFooter)
+                .ipdNo(admission.getIpdNo())
+                .admDate(TimeUtil.formatDate(admission.getAdmitDateTime()))
+                .consultant(admission.getPrimaryConsultant().getFirstName())
+                .patientName(personal.getFirstName() + " " + personal.getLastName())
+                .ageGender(ageGender)
+                .mobileNo(patient.getPatientContactInformation().getPrimaryPhone())
+                .dietRemark(diet.getFirst().getRemark())
+                .dites(diet1)
+                .build();
+
     }
 }
 

@@ -1,6 +1,7 @@
 package com.org.hosply360.repository.frontDeskRepo;
 
 import com.org.hosply360.dao.frontDeskDao.Patient;
+import com.org.hosply360.dto.frontDeskDTO.PatientInfoDTO;
 import com.org.hosply360.dto.frontDeskDTO.PatientResponseDTO;
 import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -17,8 +18,27 @@ public interface PatientRepository extends MongoRepository<Patient, String> {
     @Query("{'id': ?0, 'defunct': ?1}")
     Optional<Patient> findByIdAndDefunct(String id, boolean defunct);
 
-    @Query(value = "{'defunct': ?0, 'organization.id': ?1}")
-    List<Patient> findAllByDefuncts(Boolean defunct, String orgId);
+
+ @Aggregation(pipeline = {
+         "{ '$match': { 'organization.id': ?1, 'defunct': ?0 } }",
+
+         "{ '$addFields': { " +
+                 "'pid': '$pId', " +
+                 "'firstname': '$personal_info.first_name', " +
+                 "'lastname': '$personal_info.last_name', " +
+                 "'patientNumber': '$contact_info.primary_phone' " +
+                 "} }",
+
+         "{ '$project': { " +
+                 "'_id': 1, " +
+        //         "'id': '$_id', " +
+                 "'pid': 1, " +
+                 "'firstname': 1, " +
+                 "'lastname': 1, " +
+                 "'patientNumber': 1 " +
+                 "} }"
+ })
+ List<PatientInfoDTO> findAllByDefuncts(Boolean defunct, String orgId);
 
     @Query("{ 'patientPersonalInformation.firstName': ?0, 'patientContactInformation.primaryPhone': ?1 }")
     Optional<Patient> findByEncryptedNameAndEncryptedPhone(String encryptedName, String encryptedPhone);

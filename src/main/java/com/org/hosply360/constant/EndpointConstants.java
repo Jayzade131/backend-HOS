@@ -139,6 +139,7 @@ public class EndpointConstants {
     public static final String DELETE_APPOINTMENT_API = "/appointment/{id}/{orgId}";
     public static final String UPDATE_STATUS_API = "/updateStatus/{id}/{orgId}/{status}";
     public static final String APPOINTMENTS_FILTERS = "/appointments/filters";
+    public static final String INVOICE_WITH_APPOINTMENTS = "/with-appointments";
     public static final String GET_APPOINTMENTS_BY_ORG_ID_AND_DATE_RANGE_API = "/appointments/org/{orgId}/between-dates";
 
     // ============================ DOCTOR SCHEDULE ===================================
@@ -176,17 +177,19 @@ public class EndpointConstants {
     public static final String TEST_MANAGER = "/testManager";
     public static final String GET_TEST_MANAGER = "/testManagers/byFilter";
     public static final String TEST_MANAGER_PAYMENT = "/testManagerPayment";
+    public static final String TEST_MANAGER_BY_ID = "/testManager/{id}";
 
     public static final String TEST_PATHOLOGY_API = "/api/pathology";
     public static final String TEST_REPORT = "/testReport";
     public static final String TEST_REPORT_BY_ID = "/testReport/{testReportId}";
     public static final String DOWNLOAD_TEST_REPORT = "/testReport/download";
-    public static final String DOWNLOAD_TEST_MANAGER_BILL = "/testMangerBill/download";
+    public static final String TEST_REPORT_PDF_RESPONSE = "/testReport/getResponse";
+    public static final String GET_TEST_MANAGER_BILL = "/testManagerBill/{testManagerId}";
     public static final String GET_TEST_REPORT = "/testReport/byFilter";
 
     public static final String PACKAGE_TEST_REPORT = "/packageTestReport";
     public static final String PACKAGE_TEST_REPORT_ID = "/packageTestReport/{packageTestReportId}";
-    public static final String DOWNLOAD_PACKAGE_TEST_REPORT = "/packageTestReport/download";
+    public static final String PACKAGE_TEST_REPORT_PDF = "/packageTestReport/getResponse";
     public static final String GET_PACKAGE_TEST_REPORT = "/packageTestReport/byFilter";
 
     // ================================== OPD INVOICE ================================
@@ -195,8 +198,6 @@ public class EndpointConstants {
     public static final String GET_OPD_INVOICE_BY_ID_API = "/opdInvoice/{id}/{orgId}";
     public static final String GET_OPD_INVOICES_BY_FILTERS = "/opdInvoices/filter";
     public static final String DELETE_OPD_INVOICE_API = "/opdInvoice/delete/{id}/{orgId}";
-    public static final String DOWNLOAD_OPD_BILL_API = "/opdInvoice/download/{id}/{orgId}";
-    public static final String DOWNLOAD_OPD_RECEIPT_API = "/receipt/print/{receiptId}";
     public static final String GET_OPD_RECEIPT_API = "/receipt/data/{receiptId}";
 
     public static final String INVOICE_PAYMENT = "/opdInvoice/payment/rDownload";
@@ -237,6 +238,7 @@ public class EndpointConstants {
     public static final String IPD_BARCODE = "/barcode/{ipdAdmissionId}";
     public static final String IPD_ADMISSION_FILTERS = "/admission/filters";
     public static final String IPD_PATIENT_LIST = "/admission/patientList";
+    public static final String IPD_ADMISSION_RECORD = "/admission/record/{ipdAdmissionId}";
 
     // IPD Diet Management
     public static final String IPD_DIET = "/ipd/diet";
@@ -246,7 +248,7 @@ public class EndpointConstants {
 
     // IPD Discharge
     public static final String IPD_DISCHARGE_FORM = "/ipd/dischargeForm";
-    public static final String IPD_DISCHARGE_RECEIPT = "/dischargeReceipt";
+    public static final String IPD_DISCHARGE_RECEIPT = "/dischargeReceipt/{dischargeFormId}";
 
     // IPD Document Management
     public static final String IPD_DOCUMENT = "/ipd-document";
@@ -257,7 +259,7 @@ public class EndpointConstants {
     // IPD Transfer
     public static final String IPD_TRANSFER = "/transfer";
     public static final String IPD_TRANSFER_BY_ADMISSION = "/transfer/{ipdAdmissionId}";
-    public static final String IPD_TRANSFER_RECEIPT = "/transfer/receipt";
+    public static final String IPD_TRANSFER_RECEIPT = "/receipt/{transferId}";
 
     // IPD Surgery
     public static final String IPD_SURGERY_FORM = "/ipd-surgery-form";

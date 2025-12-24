@@ -23,6 +23,7 @@ import com.org.hosply360.dto.OPDDTO.PrescriptionResponseDTO;
 import com.org.hosply360.dto.OPDDTO.VitalsDTO;
 import com.org.hosply360.dto.globalMasterDTO.MedicineMasterDTO;
 import com.org.hosply360.dto.globalMasterDTO.TestDTO;
+import com.org.hosply360.dto.pathologyDTO.PrescribedMedPdfResponseDTO;
 import com.org.hosply360.exception.OPDException;
 import com.org.hosply360.repository.OPDRepo.PrescriptionCustomRepository;
 import com.org.hosply360.repository.OPDRepo.PrescriptionRepository;
@@ -299,29 +300,42 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
         Prescription prescription = prescriptionRepository
                 .findByIdAndOrganizationId(prescriptionId, organizationId)
-                .orElseThrow(() -> new OPDException(ErrorConstant.PRESCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND));
+                .orElseThrow(() ->
+                        new OPDException(ErrorConstant.PRESCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         PrescriptionPDFResponseDTO dto = new PrescriptionPDFResponseDTO();
 
-        dto.setPdfHeaderFooterDTO(HeaderFooterMapperUtil.buildHeaderFooter(prescription.getOrganization()));
-        // ---------- BASIC FIELDS ----------
+        // ===== Header =====
+        dto.setPdfHeaderFooterDTO(
+                HeaderFooterMapperUtil.buildHeaderFooter(prescription.getOrganization())
+        );
+
+        // ===== Basic Details =====
         dto.setPrescriptionDate(prescription.getPrescriptionDate());
-        dto.setPatientFirstName(safe(prescription.getPatient().getPatientPersonalInformation().getFirstName()));
-        dto.setPatientLastName(safe(prescription.getPatient().getPatientPersonalInformation().getLastName()));
-        dto.setPatientMidName(safe(prescription.getPatient().getPatientPersonalInformation().getMiddleName()));
+        dto.setPatientFirstName(safe(prescription.getPatient()
+                .getPatientPersonalInformation().getFirstName()));
+        dto.setPatientMidName(safe(prescription.getPatient()
+                .getPatientPersonalInformation().getMiddleName()));
+        dto.setPatientLastName(safe(prescription.getPatient()
+                .getPatientPersonalInformation().getLastName()));
+
         dto.setDoctorName(safe(prescription.getDoctor().getFirstName()));
         dto.setComplaints(safe(prescription.getComplaints()));
         dto.setPatientRecord(safe(prescription.getPatientRecord()));
         dto.setGeneralExamination(safe(prescription.getGeneralExamination()));
         dto.setHistory(safe(prescription.getHistory()));
 
-        // ---------- COMPLEX MAPPING ----------
+        // ===== Clinical Sections =====
         dto.setObstetric(mapObstetric(prescription.getObstetric()));
         dto.setVitals(mapVitals(prescription.getVitals()));
-        dto.setTest(mapTests(prescription.getTest()));
-        dto.setTestWhen(TestWhen.valueOf(safe(prescription.getTestWhen())));
+
+        // ===== Tests & Medicines (Flattened for PDF) =====
+        dto.setTest(mapTestsToString(prescription.getTest()));
+        dto.setTestWhen(parseTestWhen(prescription.getTestWhen().toString()));
+        dto.setPrescribedMeds(mapPrescribedMedsForPdf(prescription.getPrescribedMeds()));
+
+        // ===== Final Notes =====
         dto.setDiagnosis(safe(prescription.getDiagnosis()));
-        dto.setPrescribedMeds(mapPrescribedMeds(prescription.getPrescribedMeds()));
         dto.setAdvice(safe(prescription.getAdvice()));
         dto.setNextVisit(safe(prescription.getNextVisit()));
 
@@ -355,50 +369,51 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         return dto;
     }
 
-    private List<TestDTO> mapTests(List<Test> tests) {
-        if (tests == null) return List.of();
+    private List<String> mapTestsToString(List<Test> tests) {
+        if (tests == null || tests.isEmpty()) return List.of();
 
         return tests.stream()
-                .map(t -> TestDTO.builder()
-                        .id(safe(t.getId()))
-                        .name(safe(t.getName()))
-                        .amount(t.getAmount() == null ? 0 : t.getAmount())
-                        .testParameterMasters(
-                                t.getTestParameterMasters() == null ? List.of() : t.getTestParameterMasters()
-                        )
-                        .build()
-                )
+                .map(test -> safe(test.getName()))
+                .filter(name -> !name.isBlank())
                 .toList();
     }
 
-    private List<PrescribedMedResponseDTO> mapPrescribedMeds(List<PrescribedMed> meds) {
-        if (meds == null) return List.of();
+    private List<PrescribedMedPdfResponseDTO> mapPrescribedMedsForPdf(List<PrescribedMed> meds) {
+        if (meds == null || meds.isEmpty()) return List.of();
 
         return meds.stream()
-                .map(m -> {
-                    PrescribedMedResponseDTO dto = new PrescribedMedResponseDTO();
-
-                    dto.setMedicine(mapMedicine(m.getMedicineMaster()));
-                    dto.setDose(safe(m.getDose()));
-                    dto.setWhen(safe(m.getWhen()));
-                    dto.setFrequency(safe(m.getFrequency()));
-                    dto.setDuration(safe(m.getDuration()));
-                    dto.setNotes(safe(m.getNotes()));
-
-                    return dto;
-                })
+                .map(this::buildPrescribedMedPdfDto)
                 .toList();
+    }
+    private PrescribedMedPdfResponseDTO buildPrescribedMedPdfDto(PrescribedMed med) {
+        if (med == null) {
+            return PrescribedMedPdfResponseDTO.builder().build();
+        }
+
+        return PrescribedMedPdfResponseDTO.builder()
+                .medicine(extractMedicineName(med.getMedicineMaster()))
+                .dose(safe(med.getDose()))
+                .when(safe(med.getWhen()))
+                .frequency(safe(med.getFrequency()))
+                .duration(safe(med.getDuration()))
+                .notes(safe(med.getNotes()))
+                .build();
+    }
+    private String extractMedicineName(MedicineMaster medicine) {
+        if (medicine == null) return "";
+
+        return safe(medicine.getName());
     }
 
 
-    private MedicineMasterDTO mapMedicine(MedicineMaster med) {
-        if (med == null) return new MedicineMasterDTO();
 
-        MedicineMasterDTO dto = new MedicineMasterDTO();
-        dto.setId(safe(med.getId()));
-        dto.setName(safe(med.getName()));
-        dto.setManufacturer(safe(med.getManufacturer()));
-        return dto;
+
+    private TestWhen parseTestWhen(String testWhen) {
+        try {
+            return testWhen == null ? null : TestWhen.valueOf(testWhen);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
 

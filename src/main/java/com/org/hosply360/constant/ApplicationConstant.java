@@ -28,4 +28,5 @@ public class ApplicationConstant {
     public static final String AID_FORMAT = "APT%05d";
     public static final String PDF_FILENAME_PREFIX_DIET_PLAN = "DietPlan_";
     public static final String PDF_FILENAME_PREFIX_DISCHARGE_FORM = "DischargeForm_";
+    public static final String MLC = "MLC";
 }

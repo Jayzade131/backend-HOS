@@ -21,8 +21,7 @@ public interface DoctorMasterService {
 
     List<AppointmentDocInfoDTO> getAllDoctorsBySpeciality(String speId, String orgId);
 
-
-    List<AppointmentDocInfoDTO> FetchAllDoctor(String orgId);
+    List<AppointmentDocInfoDTO> fetchAllDoctor(String orgId);
 
     List<AppointmentDocInfoDTO> getDoctorByDoctorType(DoctorType doctorType, String orgId);
 }

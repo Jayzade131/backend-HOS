@@ -10,4 +10,10 @@ public interface TestReportRepository extends MongoRepository<TestReport, String
 
     @Query("{id: ?0, defunct: ?1}")
     Optional<TestReport> findByIdAndDefunct(String id, boolean defunct);
+
+    Optional<TestReport> findByTestManagerIdAndTestIdAndDefunctFalse(
+            String testManagerId,
+            String testId
+    );
+
 }

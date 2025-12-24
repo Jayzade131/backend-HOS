@@ -135,4 +135,12 @@ public class SequenceGeneratorService {
         return counter.getSeq();
     }
 
+
+    public String generatePathologyReceiptNumber() {
+        String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        long seq = generateReceiptSequence("PATHOLOGY_RECEIPT_SEQ");
+        return "PATH-" + datePart + "-" + String.format("%04d", seq);
+    }
+
+
 }

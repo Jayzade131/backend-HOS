@@ -1,26 +1,28 @@
 package com.org.hosply360.service.IPD.impl;
 
-import com.org.hosply360.constant.ApplicationConstant;
 import com.org.hosply360.constant.Enums.IpdStatus;
 import com.org.hosply360.constant.ErrorConstant;
 import com.org.hosply360.dao.IPD.IPDAdmission;
 import com.org.hosply360.dao.IPD.IPDDischargeForm;
+import com.org.hosply360.dao.IPD.IPDSurgery;
 import com.org.hosply360.dao.frontDeskDao.Doctor;
 import com.org.hosply360.dao.frontDeskDao.Patient;
 import com.org.hosply360.dao.globalMaster.Organization;
 import com.org.hosply360.dao.globalMaster.Template;
-import com.org.hosply360.dto.IPDDTO.DischargeFormPdfDTO;
+import com.org.hosply360.dto.IPDDTO.DischargeFormPdfResponseDTO;
 import com.org.hosply360.dto.IPDDTO.IPDDischargeFormReqDTO;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
+import com.org.hosply360.dto.IPDDTO.SurgeryInfoDTO;
+import com.org.hosply360.dto.utils.PdfHeaderFooterDTO;
 import com.org.hosply360.exception.IPDException;
 import com.org.hosply360.repository.IPD.IPDAdmissionRepository;
 import com.org.hosply360.repository.IPD.IPDDischargeFormRepository;
+import com.org.hosply360.repository.IPD.IPDSurgeryFormRepository;
 import com.org.hosply360.repository.frontDeskRepo.DoctorMasterRepository;
 import com.org.hosply360.service.IPD.IPDDischargeFormService;
 import com.org.hosply360.util.Others.AgeUtil;
 import com.org.hosply360.util.Others.EntityFetcherUtil;
 import com.org.hosply360.util.Others.TimeUtil;
-import com.org.hosply360.util.PDFGenUtil.IPD.DischargeFormPdfGenerator;
+import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
 import com.org.hosply360.util.validator.ValidatorHelper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -29,6 +31,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
 
 @Service
 @RequiredArgsConstructor
@@ -38,9 +42,9 @@ public class IPDDischargeFormServiceImpl implements IPDDischargeFormService {
 
     private final EntityFetcherUtil entityFetcherUtil;
     private final IPDDischargeFormRepository ipdDischargeFormRepository;
-    private final DischargeFormPdfGenerator dischargeFormPdfGenerator;
     private final IPDAdmissionRepository ipdAdmissionRepository;
     private final DoctorMasterRepository doctorRepository;
+    private final IPDSurgeryFormRepository ipdSurgeryFormRepository;
 
 
     private Doctor fetchDoctorIfPresent(String doctorId) {
@@ -107,8 +111,7 @@ public class IPDDischargeFormServiceImpl implements IPDDischargeFormService {
 
 
     @Override
-    public PdfResponseDTO generateDischargeFormPdf(String dischargeFormId) {
-
+    public DischargeFormPdfResponseDTO getDischargeFormPdf(String dischargeFormId) {
         IPDDischargeForm dischargeForm = ipdDischargeFormRepository.findById(dischargeFormId)
                 .orElseThrow(() -> new IPDException(ErrorConstant.IPD_DISCHARGE_NOT_FOUND, HttpStatus.NOT_FOUND));
 
@@ -116,40 +119,39 @@ public class IPDDischargeFormServiceImpl implements IPDDischargeFormService {
                 .orElseThrow(() -> new IPDException(ErrorConstant.IPD_ADMISSION_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         Patient patient = admission.getPatient();
-
         var personal = patient.getPatientPersonalInformation();
 
-        DischargeFormPdfDTO dto = DischargeFormPdfDTO.builder()
+        List<IPDSurgery> surgeries = ipdSurgeryFormRepository.findByOrgIdAndIpdAdmissionIdAndDefunctFalse (
+                admission.getOrgId().getId(), admission.getId());
+
+        List<SurgeryInfoDTO> surgeryInfoDTOList = surgeries.stream()
+                .map(surgery -> {
+                    SurgeryInfoDTO dto = new SurgeryInfoDTO();
+                    dto.setSurgeryType(surgery.getTypeOfSurgery());
+                    dto.setSurgeonName(surgery.getSurgeons().getFirst().getName());
+                    dto.setSurgeryDate(surgery.getDate().toString());
+                    dto.setSurgeryTime(surgery.getStartTime());
+                    return dto;
+                })
+                .toList();
+
+
+        Organization organization = entityFetcherUtil.getOrganizationOrThrow(dischargeForm.getOrganizationId());
+        PdfHeaderFooterDTO headerFooter = HeaderFooterMapperUtil.buildHeaderFooter(organization);
+
+        return DischargeFormPdfResponseDTO.builder()
+                .headerFooter(headerFooter)
                 .ipdNo(admission.getIpdNo())
-                .mrdNo(admission.getRegMrdNo())
-                .patientName(getPatientFullName(patient))
-                .fatherName(personal.getMiddleName())
                 .admissionDate(TimeUtil.formatDate(admission.getAdmitDateTime()))
                 .dischargeDate(TimeUtil.formatDate(dischargeForm.getDateTime()))
-                .address("Raipur, (C.G)")
+                .patientName(getPatientFullName(patient))
+                .patientAttendantName(personal.getMiddleName())
                 .ageGender(AgeUtil.getAge(personal.getDateOfBirth()) + " / " + personal.getGender())
+                .address(patient.getPatientContactInformation().getAddress().getCityName() + " " + patient.getPatientContactInformation().getAddress().getStateName())
                 .primaryConsultant(getConsultantName(dischargeForm.getPrimaryConsultant()))
                 .secondaryConsultant(getConsultantName(dischargeForm.getSecondaryConsultant()))
-                .thirdConsultant(getConsultantName(dischargeForm.getThirdConsultant()))
-                .type(dischargeForm.getType() != null ? dischargeForm.getType().name() : "")
-                .remark(dischargeForm.getRemarks())
-                .department("")
-                .diagnosis("")
-                .complaints("")
-                .investigations("")
-                .treatment("")
-                .indication("")
-                .history("")
-                .examination("")
-                .rx("")
-                .review("")
-                .build();
-
-        byte[] pdfBytes = dischargeFormPdfGenerator.generateDischargeFormPdf(dto);
-
-        return PdfResponseDTO.builder()
-                .body(pdfBytes)
-                .fileName(ApplicationConstant.PDF_FILENAME_PREFIX_DISCHARGE_FORM + dto.getPatientName() + ".pdf")
+                .status(dischargeForm.getType() != null ? dischargeForm.getType().toString() : "")
+                .surgeries(surgeryInfoDTOList)
                 .build();
     }
 }

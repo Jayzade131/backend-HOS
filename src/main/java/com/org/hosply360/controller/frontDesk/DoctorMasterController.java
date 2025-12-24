@@ -68,7 +68,7 @@ public class DoctorMasterController {
     @GetMapping(EndpointConstants.FETCH_ALL_DOCTOR)
     public ResponseEntity<AppResponseDTO> fetchAllDoctor(@PathVariable String organizationId) {
         logger.info("Fetching all doctors");
-        return ResponseEntity.ok(AppResponseDTO.ok(doctorMasterService.FetchAllDoctor(organizationId)));
+        return ResponseEntity.ok(AppResponseDTO.ok(doctorMasterService.fetchAllDoctor(organizationId)));
     }
 
     @GetMapping(EndpointConstants.GET_DOCTORS_BY_DOCTOR_TYPE_API)

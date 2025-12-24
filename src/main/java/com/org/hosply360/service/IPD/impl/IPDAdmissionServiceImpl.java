@@ -1,5 +1,6 @@
 package com.org.hosply360.service.IPD.impl;
 
+import com.org.hosply360.constant.ApplicationConstant;
 import com.org.hosply360.constant.Enums.AdmitStatus;
 import com.org.hosply360.constant.Enums.IpdStatus;
 import com.org.hosply360.constant.ErrorConstant;
@@ -9,26 +10,36 @@ import com.org.hosply360.dao.IPD.IPDFinancialSummary;
 import com.org.hosply360.dao.IPD.InsuranceDetails;
 import com.org.hosply360.dao.frontDeskDao.Doctor;
 import com.org.hosply360.dao.frontDeskDao.Patient;
+import com.org.hosply360.dao.globalMaster.Address;
 import com.org.hosply360.dao.globalMaster.Organization;
 import com.org.hosply360.dao.globalMaster.PatientCategory;
 import com.org.hosply360.dao.globalMaster.Speciality;
 import com.org.hosply360.dao.globalMaster.WardBedMaster;
 import com.org.hosply360.dao.globalMaster.WardMaster;
+import com.org.hosply360.dto.IPDDTO.AdmissionInfoDTO;
+import com.org.hosply360.dto.IPDDTO.AdmissionRecordResponseDTO;
 import com.org.hosply360.dto.IPDDTO.BarcodeResDTO;
 import com.org.hosply360.dto.IPDDTO.BedResponseDTO;
+import com.org.hosply360.dto.IPDDTO.ConsultantInfoDTO;
 import com.org.hosply360.dto.IPDDTO.IPDAdmissionDTO;
 import com.org.hosply360.dto.IPDDTO.IPDAdmissionReqDTO;
 import com.org.hosply360.dto.IPDDTO.IPDAdmissionStatusReqDTO;
 import com.org.hosply360.dto.IPDDTO.IPDPatientListDTO;
+import com.org.hosply360.dto.IPDDTO.MedicalInfoDTO;
+import com.org.hosply360.dto.IPDDTO.PatientInfoDetailDTO;
+import com.org.hosply360.dto.IPDDTO.WardBedInfoDTO;
 import com.org.hosply360.exception.IPDException;
 import com.org.hosply360.repository.IPD.IPDAdmissionRepository;
 import com.org.hosply360.repository.IPD.IPDFinancialSummaryRepository;
 import com.org.hosply360.repository.IPD.customRepo.IPDAdmissionCustomRepository;
 import com.org.hosply360.repository.globalMasterRepo.WardBedMasterRepository;
 import com.org.hosply360.service.IPD.IPDAdmissionService;
+import com.org.hosply360.util.Others.AgeUtil;
 import com.org.hosply360.util.Others.BarcodeGenerator;
 import com.org.hosply360.util.Others.EntityFetcherUtil;
 import com.org.hosply360.util.Others.SequenceGeneratorService;
+import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
+import com.org.hosply360.util.validator.ValidatorHelper;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
@@ -310,6 +321,163 @@ public class IPDAdmissionServiceImpl implements IPDAdmissionService {
         return BarcodeResDTO.builder()
                 .barcodeImage(barcodeImage)
                 .barcodeText(barcodeText)
+                .build();
+    }
+
+    @Override
+    public AdmissionRecordResponseDTO getAdmissionRecord(String ipdId) {
+
+        // ===== Validation =====
+        ValidatorHelper.validateObject(ipdId);
+        logger.info("Fetching IPD admission record for IPD ID: {}", ipdId);
+
+        // ===== Fetch IPD Admission =====
+        IPDAdmission ipdAdmission = ipdAdmissionRepository
+                .findByIdAndDefunct(ipdId, false)
+                .orElseThrow(() -> {
+                    logger.error("IPD Admission not found for ID: {}", ipdId);
+                    return new IPDException(
+                            ErrorConstant.IPD_ADMISSION_NOT_FOUND,
+                            HttpStatus.NOT_FOUND
+                    );
+                });
+
+        // ===== Patient Mapping =====
+        Patient patient = ipdAdmission.getPatient();
+        PatientInfoDetailDTO patientInfo = buildPatientInfo(patient);
+
+        // ===== Admission Info =====
+        AdmissionInfoDTO admissionInfo = AdmissionInfoDTO.builder()
+                .ipdId(ipdAdmission.getId())
+                .ipdNo(ipdAdmission.getIpdNo())
+                .regMrdNo(ipdAdmission.getRegMrdNo())
+                .admitDateTime(ipdAdmission.getAdmitDateTime().toString())
+                .dischargeDateTime(ipdAdmission.getDischargeDateTime().toString())
+                .department(ipdAdmission.getDepartment().getDepartment())
+                .patientType(ipdAdmission.getPatientType().toString())
+                .referredBy(ipdAdmission.getRefBy().getFirstName())
+                .ipdStatus(ipdAdmission.getIpdStatus().toString())
+                .build();
+
+        // ===== Ward & Bed Info =====
+        WardBedInfoDTO wardBedInfo = WardBedInfoDTO.builder()
+                .wardName(
+                        ipdAdmission.getWardMaster() != null
+                                ? ipdAdmission.getWardMaster().getWardName()
+                                : null
+                )
+                .bedNo(
+                        ipdAdmission.getBedMaster() != null
+                                ? ipdAdmission.getBedMaster().getBedNo()
+                                : null
+                )
+                .build();
+
+        // ===== Consultant Info =====
+        ConsultantInfoDTO consultantInfo = ConsultantInfoDTO.builder()
+                .consultant(
+                        ipdAdmission.getPrimaryConsultant() != null
+                                ? ipdAdmission.getPrimaryConsultant().getFirstName()
+                                : null
+                )
+                .secondaryConsultant(
+                        ipdAdmission.getSecondaryConsultant() != null
+                                ? ipdAdmission.getSecondaryConsultant().getFirstName()
+                                : null
+                )
+                .referredBy(ipdAdmission.getRefBy().getFirstName())
+                .build();
+
+        // ===== Medical Info =====
+        MedicalInfoDTO medicalInfo = MedicalInfoDTO.builder()
+                .diagnosis(ipdAdmission.getDiagnosis())
+                .isMLC(ApplicationConstant.MLC.equalsIgnoreCase(ipdAdmission.getIsPatient().toString()))
+                .build();
+
+        // ===== Final Response =====
+        AdmissionRecordResponseDTO response = AdmissionRecordResponseDTO.builder()
+                .admissionInfo(admissionInfo)
+                .patientInfo(patientInfo)
+                .wardBedInfo(wardBedInfo)
+                .consultantInfo(consultantInfo)
+                .medicalInfo(medicalInfo)
+                .remarks(ipdAdmission.getRemarks())
+                .headerFooter(
+                        HeaderFooterMapperUtil.buildHeaderFooter(
+                                ipdAdmission.getOrgId()
+                        )
+                )
+                .build();
+
+        logger.info("Successfully built AdmissionRecordResponseDTO for IPD ID: {}", ipdId);
+        return response;
+    }
+
+    // =========================================================
+    // ================= PRIVATE MAPPER METHODS =================
+    // =========================================================
+
+    private PatientInfoDetailDTO buildPatientInfo(Patient patient) {
+
+        if (patient == null) {
+            return null;
+        }
+
+        var personal = patient.getPatientPersonalInformation();
+        var contact = patient.getPatientContactInformation();
+
+        String firstName = null;
+        String lastName = null;
+        String gender = null;
+        String bloodGroup = null;
+        String maritalStatus = null;
+        String dob = null;
+
+        if (personal != null) {
+            firstName = personal.getFirstName();
+            lastName = personal.getLastName();
+            gender = personal.getGender();
+            bloodGroup = personal.getBloodType();
+            maritalStatus = personal.getMaritalStatus();
+            dob = personal.getDateOfBirth();
+        }
+
+        String primaryPhone = null;
+        String secondaryPhone = null;
+        String email = null;
+        String formattedAddress = null;
+
+        if (contact != null) {
+            primaryPhone = contact.getPrimaryPhone();
+            secondaryPhone = contact.getSecondaryPhone();
+            email = contact.getEmail();
+
+            Address addr = contact.getAddress();
+            if (addr != null) {
+                formattedAddress = String.join(", ",
+                        addr.getBuildingFlat(),
+                        addr.getStreet(),
+                        addr.getCityName(),
+                        addr.getStateName(),
+                        addr.getCountryName()
+                ) + " - " + addr.getPinCode();
+            }
+        }
+
+        return PatientInfoDetailDTO.builder()
+                .id(patient.getId())
+                .pid(patient.getPId())
+                .firstname(firstName)
+                .lastname(lastName)
+                .patientNumber(primaryPhone)
+                .dateOfBirth(dob)
+                .age(AgeUtil.getAge(dob))
+                .gender(gender)
+                .bloodGroup(bloodGroup)
+                .maritalStatus(maritalStatus)
+                .alternateNo(secondaryPhone)
+                .email(email)
+                .address(formattedAddress)
                 .build();
     }
 

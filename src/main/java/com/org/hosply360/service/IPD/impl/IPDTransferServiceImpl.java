@@ -7,12 +7,13 @@ import com.org.hosply360.dao.IPD.IPDAdmission;
 import com.org.hosply360.dao.IPD.IpdTransfer;
 import com.org.hosply360.dao.auth.Users;
 import com.org.hosply360.dao.frontDeskDao.Patient;
+import com.org.hosply360.dao.globalMaster.Organization;
 import com.org.hosply360.dao.globalMaster.WardBedMaster;
 import com.org.hosply360.dao.globalMaster.WardMaster;
 import com.org.hosply360.dto.IPDDTO.IpdTransferDTO;
 import com.org.hosply360.dto.IPDDTO.IpdTransferHistoryDto;
-import com.org.hosply360.dto.IPDDTO.TransferReceiptDto;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
+import com.org.hosply360.dto.IPDDTO.TransferReceiptPdfDTO;
+import com.org.hosply360.dto.utils.PdfHeaderFooterDTO;
 import com.org.hosply360.exception.GlobalMasterException;
 import com.org.hosply360.exception.IPDException;
 import com.org.hosply360.repository.IPD.IPDAdmissionRepository;
@@ -22,7 +23,7 @@ import com.org.hosply360.repository.globalMasterRepo.WardBedMasterRepository;
 import com.org.hosply360.service.IPD.IPDTransferService;
 import com.org.hosply360.util.Others.AgeUtil;
 import com.org.hosply360.util.Others.EntityFetcherUtil;
-import com.org.hosply360.util.PDFGenUtil.TransferReceiptPdfGenerator;
+import com.org.hosply360.util.mapper.HeaderFooterMapperUtil;
 import com.org.hosply360.util.mapper.ObjectMapperUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
@@ -32,7 +33,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
@@ -50,7 +51,6 @@ public class IPDTransferServiceImpl implements IPDTransferService {
     private final IPDAdmissionRepository ipdAdmissionRepository;
     private final WardBedMasterRepository wardBedMasterRepo;
     private final UsersRepository userRepository;
-    private final TransferReceiptPdfGenerator transferReceiptPdfGenerator;
 
     private static final Logger logger = LoggerFactory.getLogger(IPDTransferServiceImpl.class);
 
@@ -157,6 +157,7 @@ public class IPDTransferServiceImpl implements IPDTransferService {
                 .toList();
     }
 
+
     private String fetchUserNameById(String userId) {
         return userRepository.findById(userId)
                 .map(Users::getName)
@@ -177,7 +178,7 @@ public class IPDTransferServiceImpl implements IPDTransferService {
 
 
     @Override
-    public PdfResponseDTO generateTransferReceiptPdf(String transferId) {
+    public TransferReceiptPdfDTO getTransferReceiptPdf(String transferId) {
         IpdTransfer transfer = ipdTransferRepo.findById(transferId)
                 .orElseThrow(() -> new IPDException(ErrorConstant.ITEM_NOT_FOUND, HttpStatus.NOT_FOUND));
 
@@ -190,8 +191,15 @@ public class IPDTransferServiceImpl implements IPDTransferService {
 
         String age = AgeUtil.getAge(patient.getPatientPersonalInformation());
 
-        TransferReceiptDto dto = TransferReceiptDto.builder()
-                .patientName(patient.getPatientPersonalInformation().getFirstName() + " " + patient.getPatientPersonalInformation().getLastName())
+        Organization organization = admission.getOrgId();
+        PdfHeaderFooterDTO headerFooter = HeaderFooterMapperUtil.buildHeaderFooter(organization);
+
+        return TransferReceiptPdfDTO.builder()
+                .headerFooter(headerFooter)
+                .patientName(
+                        patient.getPatientPersonalInformation().getFirstName() + " " +
+                                patient.getPatientPersonalInformation().getLastName()
+                )
                 .gender(patient.getPatientPersonalInformation().getGender())
                 .age(age)
                 .mobileNumber(patient.getPatientContactInformation().getPrimaryPhone())
@@ -204,14 +212,8 @@ public class IPDTransferServiceImpl implements IPDTransferService {
                 .fromBed(getSafeBedNumber(transfer.getCurrentBed()))
                 .toWard(getSafeName(transfer.getTransferWard()))
                 .toBed(getSafeBedNumber(transfer.getTransferBed()))
-                .createdBy(createdByName)
                 .build();
-
-        byte[] pdfBytes = transferReceiptPdfGenerator.generateTransferReceiptPDF(dto);
-        String fileName = "IPD_Transfer_Receipt_" + admission.getIpdNo() + "_" + LocalDate.now() + ".pdf";
-        return new PdfResponseDTO(pdfBytes, fileName);
     }
-
 }
 
 

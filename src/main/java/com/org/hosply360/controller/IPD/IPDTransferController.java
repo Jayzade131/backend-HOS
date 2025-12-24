@@ -2,20 +2,17 @@ package com.org.hosply360.controller.IPD;
 
 import com.org.hosply360.constant.EndpointConstants;
 import com.org.hosply360.dto.IPDDTO.IpdTransferDTO;
-import com.org.hosply360.dto.OPDDTO.PdfResponseDTO;
 import com.org.hosply360.dto.authDTO.AppResponseDTO;
 import com.org.hosply360.service.IPD.IPDTransferService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,12 +35,8 @@ public class IPDTransferController {
     }
 
     @GetMapping(EndpointConstants.IPD_TRANSFER_RECEIPT)
-    public ResponseEntity<AppResponseDTO> downloadTransferReceiptPDF(@RequestParam String transferId) {
-        PdfResponseDTO pdfResponseDTO = ipdTransferService.generateTransferReceiptPdf(transferId);
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(AppResponseDTO.ok(pdfResponseDTO));
+    public ResponseEntity<AppResponseDTO> getTransferReceipt(@PathVariable String transferId) {
+        return ResponseEntity.ok(AppResponseDTO.ok(ipdTransferService.getTransferReceiptPdf(transferId)));
+
     }
-
-
 }

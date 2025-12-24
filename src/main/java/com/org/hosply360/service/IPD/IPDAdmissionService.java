@@ -1,5 +1,6 @@
 package com.org.hosply360.service.IPD;
 
+import com.org.hosply360.dto.IPDDTO.AdmissionRecordResponseDTO;
 import com.org.hosply360.dto.IPDDTO.BarcodeResDTO;
 import com.org.hosply360.dto.IPDDTO.BedResponseDTO;
 import com.org.hosply360.dto.IPDDTO.IPDAdmissionDTO;
@@ -12,8 +13,11 @@ import java.time.LocalDate;
 
 public interface IPDAdmissionService {
     String createAdmission(IPDAdmissionReqDTO requestDTO);
+
     String updateAdmission(IPDAdmissionReqDTO requestDTO);
+
     BedResponseDTO getBedsByWardId(String orgId, String wardId);
+
     Page<IPDAdmissionDTO> getAdmissions(
             String orgId,
             String id,
@@ -39,5 +43,7 @@ public interface IPDAdmissionService {
     String cancelAdmission(IPDAdmissionStatusReqDTO requestDTO);
 
     BarcodeResDTO getIpdBarcode(String IpdId);
+
+    AdmissionRecordResponseDTO getAdmissionRecord(String ipdId);
 
 }
